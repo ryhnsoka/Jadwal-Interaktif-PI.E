@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistem Jadwal Akademik Interaktif - PI.E</title>
   
+  <!-- PUSTAKA DI AWAL UNTUK MENCEGAH GAGAL UNDUH -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -33,6 +34,7 @@
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans transition-colors duration-200">
 
+  <!-- HEADER UTAMA (Disembunyikan saat ekspor/print) -->
   <header class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-md p-4 sticky top-0 z-30 print-hidden">
     <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
       <div>
@@ -44,6 +46,7 @@
         </h1>
       </div>
       
+      <!-- Tombol Aksi -->
       <div class="flex flex-wrap items-center gap-2 justify-center">
         <div class="bg-indigo-900/60 p-1 rounded-lg flex items-center border border-indigo-700">
           <button id="btn-view-classic" class="px-3 py-1.5 rounded text-xs font-semibold bg-white text-indigo-950 shadow transition">Klasik</button>
@@ -56,12 +59,15 @@
         <button id="btn-export-png" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-sky-500 shadow transition">Unduh PNG</button>
         <button id="btn-export-pdf" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-red-500 shadow transition">Unduh PDF</button>
         <button id="btn-print" class="bg-white hover:bg-slate-100 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-300 transition">Cetak</button>
+        <button id="btn-reset" class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition border border-slate-700">Reset</button>
       </div>
     </div>
   </header>
 
+  <!-- KONTEN UTAMA -->
   <main class="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6">
     
+    <!-- Info Legenda Warna (Mode Web) -->
     <div class="flex flex-wrap gap-4 items-center justify-center bg-white p-3 rounded-xl shadow-sm border border-slate-200 mb-4 text-xs md:text-sm font-semibold print-hidden select-none">
       <span class="text-slate-700 font-bold mr-1">Legenda:</span>
       <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-[#ffff00] border border-slate-300"></span> Kuning (Online)</span>
@@ -69,13 +75,16 @@
       <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-[#ff9f00]"></span> Oranye (Lainnya)</span>
     </div>
 
+    <!-- Peringatan Mode Edit -->
     <div id="info-edit-mode" class="hidden bg-amber-50 border-l-4 border-amber-500 text-amber-900 p-3 rounded-r-lg mb-4 text-xs md:text-sm items-center gap-2 shadow-sm animate-pulse print-hidden">
       <svg class="w-5 h-5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
       <div><strong>Mode Edit:</strong> Klik jadwal untuk mengubah/menghapus, atau klik kotak kosong untuk menambah jadwal baru.</div>
     </div>
 
+    <!-- WADAH TABEL (Area yang akan di-ekspor) -->
     <div id="schedule-table-card" class="bg-white rounded-xl shadow-lg border border-slate-200 p-3 md:p-6 print:shadow-none print:border-none print:p-0 transition-all duration-300 overflow-hidden">
       
+      <!-- Legenda Khusus untuk Hasil Unduhan PNG/PDF (Ramping tanpa judul besar) -->
       <div id="export-header" class="hidden text-center mb-4">
         <div class="flex justify-center gap-6 text-[11px] font-bold text-black pb-2 border-b-2 border-black">
           <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 border border-black bg-[#ffff00] inline-block"></span> Kuning (Online)</span>
@@ -84,10 +93,12 @@
         </div>
       </div>
 
+      <!-- Scroll Wrapper -->
       <div class="overflow-x-auto relative rounded-lg border border-slate-200 md:border-none" id="table-scroll-container">
         <div id="table-wrapper"></div>
       </div>
       
+      <!-- Petunjuk Geser di HP -->
       <div class="flex items-center justify-center gap-1 text-slate-400 text-[10px] font-bold mt-3 md:hidden print-hidden select-none">
         <svg class="w-3 h-3 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
         <span>Geser ke samping untuk melihat hari berikutnya</span>
@@ -95,6 +106,7 @@
     </div>
   </main>
 
+  <!-- MODAL: KONFIRMASI -->
   <div id="confirm-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
     <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-5 animate-scaleUp">
       <h3 class="font-bold text-lg text-slate-800 mb-2" id="confirm-title">Konfirmasi</h3>
@@ -106,6 +118,7 @@
     </div>
   </div>
 
+  <!-- MODAL: EDITOR JADWAL -->
   <div id="editor-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
     <div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-scaleUp">
       <div class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-4 flex justify-between items-center">
@@ -162,6 +175,7 @@
 
   <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none print-hidden"></div>
 
+  <!-- FIREBASE & LOGIC SCRIPT -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -334,9 +348,9 @@
 
             if (cell.status === "start") {
               td.setAttribute("rowspan", cell.block.rowSpan);
-              let color = "bg-yellow-100 text-yellow-950 border-yellow-300";
-              if (cell.block.type === "green") color = "bg-emerald-100 text-emerald-950 border-emerald-300";
-              else if (cell.block.type === "orange") color = "bg-orange-100 text-orange-950 border-orange-300";
+              let color = "bg-yellow-100 text-yellow-955 border-yellow-300";
+              if (cell.block.type === "green") color = "bg-emerald-100 text-emerald-955 border-emerald-300";
+              else if (cell.block.type === "orange") color = "bg-orange-100 text-orange-955 border-orange-300";
 
               td.innerHTML = `
                 <div class="mx-0.5 p-1 rounded-lg border shadow-sm flex flex-col items-center justify-center min-h-[38px] relative ${color} ${!isExporting && editMode ? "cursor-pointer hover:opacity-90" : ""}">
@@ -352,7 +366,7 @@
               }
             } else {
               td.innerHTML = `<div class="min-h-[36px] rounded-lg border flex items-center justify-center ${isExporting ? "border-transparent" : (editMode ? "border-dashed border-slate-200 hover:bg-slate-50 cursor-pointer" : "border-transparent")}">
-                ${editMode && !isExporting ? '<span class="text-slate-300 text-xl font-bold leading-none">+</span>' : ""}
+                ${editMode && !isExporting ? '<span class="text-slate-400 text-xl font-bold leading-none">+</span>' : ""}
               </div>`;
               if (!isExporting) td.onclick = () => editMode ? openEditor(null, day, rIdx) : null;
             }
@@ -463,7 +477,7 @@
       initSnapshot();
     });
 
-    // 7. FUNGSI EKSPOR ANTI-TERPOTONG
+    // 7. FUNGSI EKSPOR ANTI-TERPOTONG (MENGGUNAKAN OFF-SCREEN SANDBOX CLONING KHUSUS HP)
     const exportDocument = async (type) => {
       try {
         const overlay = document.getElementById("loading-overlay");
@@ -473,34 +487,72 @@
         renderTable();
         overlay.classList.remove("hidden"); overlay.classList.add("flex");
         
+        // Beri jeda kecil agar DOM ter-render bersih
         await new Promise(r => setTimeout(r, 200));
 
-        const targetEl = document.getElementById("schedule-table-card");
-        
-        // Simpan gaya asli
-        const origWidth = targetEl.style.width;
-        const origMaxWidth = targetEl.style.maxWidth;
-        const origOverflow = targetEl.style.overflow;
-        
-        // Paksa Container memiliki dimensi penuh saat proses capture
-        targetEl.style.width = "880px";
-        targetEl.style.maxWidth = "none";
-        targetEl.style.overflow = "visible";
-        document.getElementById("export-header").classList.remove("hidden");
+        const originalElement = document.getElementById("schedule-table-card");
+        if (!originalElement) throw new Error("Card tabel tidak ditemukan");
 
-        const canvas = await window.html2canvas(targetEl, {
-          scale: 3, 
+        // 1. Buat sandbox container di luar aliran layar aktif (mencegah clipping mobile viewport)
+        const sandbox = document.createElement("div");
+        sandbox.style.position = "absolute";
+        sandbox.style.left = "-9999px";
+        sandbox.style.top = "0";
+        sandbox.style.width = "920px"; // Beri ruang bernapas ekstra untuk margins/paddings
+        sandbox.style.height = "auto";
+        sandbox.style.overflow = "visible";
+        sandbox.style.backgroundColor = "#f8fafc"; // samakan dengan warna latar belakang body (bg-slate-50)
+
+        // 2. Kloning elemen asli jadwal
+        const clonedElement = originalElement.cloneNode(true);
+        clonedElement.style.width = "880px";
+        clonedElement.style.maxWidth = "880px";
+        clonedElement.style.minWidth = "880px";
+        clonedElement.style.overflow = "visible";
+        clonedElement.style.boxShadow = "none";
+        clonedElement.style.border = "none";
+        clonedElement.style.padding = "24px";
+        clonedElement.style.margin = "0 auto";
+
+        // Pastikan header ekspor (legenda) tampil di dalam kloningan
+        const clonedHeader = clonedElement.querySelector("#export-header");
+        if (clonedHeader) clonedHeader.classList.remove("hidden");
+
+        // 3. PENTING: Hilangkan batasan scroll/overflow pada pembungkus tabel di dalam hasil kloning
+        const clonedScrollContainer = clonedElement.querySelector("#table-scroll-container");
+        if (clonedScrollContainer) {
+          clonedScrollContainer.style.overflow = "visible";
+          clonedScrollContainer.style.width = "100%";
+          clonedScrollContainer.style.maxWidth = "none";
+          clonedScrollContainer.style.minWidth = "auto";
+        }
+
+        // Paksa tabel di dalam hasil kloning agar ter-render penuh selebar 880px
+        const clonedTable = clonedElement.querySelector("table");
+        if (clonedTable) {
+          clonedTable.style.width = "100%";
+          clonedTable.style.minWidth = "100%";
+          clonedTable.style.maxWidth = "100%";
+          clonedTable.style.overflow = "visible";
+        }
+
+        sandbox.appendChild(clonedElement);
+        document.body.appendChild(sandbox);
+
+        // Beri waktu browser memproses render off-screen
+        await new Promise(r => requestAnimationFrame(r));
+
+        const canvas = await window.html2canvas(clonedElement, {
+          scale: 3, // Kualitas HD Retina super jernih
           useCORS: true, 
           logging: false, 
           backgroundColor: "#ffffff",
-          windowWidth: 880
+          width: 880,
+          height: clonedElement.scrollHeight
         });
 
-        // Kembalikan gaya ke bentuk responsif semula
-        targetEl.style.width = origWidth;
-        targetEl.style.maxWidth = origMaxWidth;
-        targetEl.style.overflow = origOverflow;
-        document.getElementById("export-header").classList.add("hidden");
+        // Bersihkan sandbox dari DOM
+        document.body.removeChild(sandbox);
 
         const imgData = canvas.toDataURL("image/png");
         const dateStr = getFormattedDate();

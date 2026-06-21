@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistem Jadwal Akademik Interaktif - PI.E</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  
+  <style>
+    /* Scroll horizontal yang halus di HP */
+    .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+    
+    /* Mencegah background transparan pada kolom waktu yang sticky */
+    .sticky { background-clip: padding-box; }
+    
+    /* Pengaturan saat dicetak via browser (Ctrl+P) */
+    @media print {
+      body { background-color: white !important; color: black !important; }
+      table { border: 2px solid black !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      th, td { border: 1px solid black !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .print-hidden { display: none !important; }
+    }
+    
+    /* Animasi UI */
+    @keyframes scaleUp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .animate-scaleUp { animation: scaleUp 0.15s ease-out forwards; }
+    .animate-slideInRight { animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans transition-colors duration-200">
+
+  <header class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-md p-4 sticky top-0 z-30 print-hidden">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight flex items-center gap-2">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Sistem Jadwal Interaktif PI.E
+        </h1>
+      </div>
+      
+      <div class="flex flex-wrap items-center gap-2 justify-center">
+        <div class="bg-indigo-900/60 p-1 rounded-lg flex items-center border border-indigo-700">
+          <button id="btn-view-classic" class="px-3 py-1.5 rounded text-xs font-semibold bg-white text-indigo-950 shadow transition">Klasik</button>
+          <button id="btn-view-modern" class="px-3 py-1.5 rounded text-xs font-semibold text-white hover:bg-white/10 transition">Modern</button>
+        </div>
+        <button id="btn-toggle-edit" class="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 border transition bg-slate-700 hover:bg-slate-600 border-slate-600 text-white">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+          <span id="text-toggle-edit">Edit Jadwal</span>
+        </button>
+        <button id="btn-export-png" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-sky-500 shadow transition">Unduh PNG</button>
+        <button id="btn-export-pdf" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-red-500 shadow transition">Unduh PDF</button>
+        <button id="btn-print" class="bg-white hover:bg-slate-100 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-300 transition">Cetak</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6">
+    
+    <div class="flex flex-wrap gap-4 items-center justify-center bg-white p-3 rounded-xl shadow-sm border border-slate-200 mb-4 text-xs md:text-sm font-semibold print-hidden select-none">
+      <span class="text-slate-700 font-bold mr-1">Legenda:</span>
+      <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-[#ffff00] border border-slate-300"></span> Kuning (Online)</span>
+      <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-[#00b050]"></span> Hijau (Offline)</span>
+      <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-[#ff9f00]"></span> Oranye (Lainnya)</span>
+    </div>
+
+    <div id="info-edit-mode" class="hidden bg-amber-50 border-l-4 border-amber-500 text-amber-900 p-3 rounded-r-lg mb-4 text-xs md:text-sm items-center gap-2 shadow-sm animate-pulse print-hidden">
+      <svg class="w-5 h-5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+      <div><strong>Mode Edit:</strong> Klik jadwal untuk mengubah/menghapus, atau klik kotak kosong untuk menambah jadwal baru.</div>
+    </div>
+
+    <div id="schedule-table-card" class="bg-white rounded-xl shadow-lg border border-slate-200 p-3 md:p-6 print:shadow-none print:border-none print:p-0 transition-all duration-300 overflow-hidden">
+      
+      <div id="export-header" class="hidden text-center mb-4">
+        <div class="flex justify-center gap-6 text-[11px] font-bold text-black pb-2 border-b-2 border-black">
+          <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 border border-black bg-[#ffff00] inline-block"></span> Kuning (Online)</span>
+          <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 border border-black bg-[#00b050] inline-block"></span> Hijau (Offline)</span>
+          <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 border border-black bg-[#ff9f00] inline-block"></span> Oranye (Lainnya)</span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto relative rounded-lg border border-slate-200 md:border-none" id="table-scroll-container">
+        <div id="table-wrapper"></div>
+      </div>
+      
+      <div class="flex items-center justify-center gap-1 text-slate-400 text-[10px] font-bold mt-3 md:hidden print-hidden select-none">
+        <svg class="w-3 h-3 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+        <span>Geser ke samping untuk melihat hari berikutnya</span>
+      </div>
+    </div>
+  </main>
+
+  <div id="confirm-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-5 animate-scaleUp">
+      <h3 class="font-bold text-lg text-slate-800 mb-2" id="confirm-title">Konfirmasi</h3>
+      <p class="text-sm text-slate-600 mb-5" id="confirm-message">Apakah Anda yakin?</p>
+      <div class="flex justify-end gap-2">
+        <button id="btn-confirm-cancel" class="bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg text-sm font-bold transition">Batal</button>
+        <button id="btn-confirm-ok" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition">Ya, Lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="editor-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-scaleUp">
+      <div class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-4 flex justify-between items-center">
+        <h3 class="font-bold flex items-center gap-1.5 text-base" id="editor-modal-title">Ubah Detail Jadwal</h3>
+        <button id="btn-close-editor" class="text-white hover:text-slate-200 transition"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+      </div>
+      <form id="editor-form" class="p-5 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Nama Siswa / Kelas</label>
+          <input type="text" id="form-name" placeholder="Kosongkan untuk menghapus" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Hari</label>
+            <select id="form-day" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Warna</label>
+            <select id="form-type" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold">
+              <option value="yellow" class="bg-yellow-100 text-yellow-800">Kuning (Online)</option>
+              <option value="green" class="bg-emerald-100 text-emerald-800">Hijau (Offline)</option>
+              <option value="orange" class="bg-orange-100 text-orange-800">Oranye (Lainnya)</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Mulai Pukul</label>
+            <select id="form-start-row" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Durasi</label>
+            <select id="form-row-span" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+              <option value="1">30 Menit</option><option value="2">1 Jam</option><option value="3">1.5 Jam</option><option value="4">2 Jam</option>
+              <option value="5">2.5 Jam</option><option value="6">3 Jam</option><option value="7">3.5 Jam</option><option value="8">4 Jam</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 pt-3 border-t border-slate-100">
+          <button type="button" id="btn-delete-block" class="hidden mr-auto bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm font-bold">Hapus</button>
+          <button type="button" id="btn-cancel-editor" class="bg-slate-100 px-4 py-2 rounded-lg text-sm font-bold">Batal</button>
+          <button type="submit" class="bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="loading-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden flex-col items-center justify-center z-50 text-white">
+    <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex flex-col items-center max-w-xs text-center shadow-2xl animate-scaleUp">
+      <svg class="animate-spin h-10 w-10 text-blue-500 mb-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+      <p id="loading-text" class="text-sm font-semibold">Memproses Dokumen...</p>
+    </div>
+  </div>
+
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none print-hidden"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // 1. CONFIG FIREBASE MILIK ANDA
+    const firebaseConfig = {
+      apiKey: "AIzaSyCk9rIY7N5UfWyEb2dgstAjBPzK4_890hQ",
+      authDomain: "sistem-jadwal-interaktif.firebaseapp.com",
+      projectId: "sistem-jadwal-interaktif",
+      storageBucket: "sistem-jadwal-interaktif.firebasestorage.app",
+      messagingSenderId: "1083907639855",
+      appId: "1:1083907639855:web:3229f9685437762cc714da"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const schedulesRef = collection(db, "schedules");
+
+    // 2. DATA REFERENSI
+    const DAYS = ["Ahad", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const TIME_SLOTS = [
+      "06:00 - 06:30", "06:30 - 07:00", "07:00 - 07:30", "07:30 - 08:00", "08:00 - 08:30", "08:30 - 09:00", 
+      "09:00 - 09:30", "09:30 - 10:00", "10:00 - 10:30", "10:30 - 11:00", "11:00 - 11:30", "11:30 - 12:00", 
+      "12:00 - 12:30", "12:30 - 13:00", "13:00 - 13:30", "13:30 - 14:00", "14:00 - 14:30", "14:30 - 15:00", 
+      "15:00 - 15:30", "15:30 - 16:00", "16:00 - 16:30", "16:30 - 17:00", "17:00 - 17:30", "17:30 - 18:00", 
+      "18:00 - 18:30", "18:30 - 19:00", "19:00 - 19:30", "19:30 - 20:00", "20:00 - 20:30", "20:30 - 21:00", "21:00 - ..."
+    ];
+
+    let blocks = [];
+    let viewMode = "classic"; 
+    let editMode = false;
+    let isExporting = false;
+    let selectedBlock = null;
+
+    // 3. FUNGSI UTILITAS
+    const getFormattedDate = () => {
+      const d = new Date();
+      const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      return `${d.getDate()}_${monthNames[d.getMonth()]}_${d.getFullYear()}`;
+    };
+
+    const showToast = (msg) => {
+      const t = document.createElement("div");
+      t.className = "bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-2xl flex items-center justify-between gap-3 animate-slideInRight pointer-events-auto";
+      t.innerHTML = `<span class="font-bold">${msg}</span><button class="text-xl leading-none hover:text-red-400" onclick="this.parentElement.remove()">&times;</button>`;
+      document.getElementById("toast-container").appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    };
+
+    const showConfirm = (msg, title, onOk) => {
+      const modal = document.getElementById("confirm-modal");
+      document.getElementById("confirm-title").innerText = title;
+      document.getElementById("confirm-message").innerText = msg;
+      modal.classList.remove("hidden"); modal.classList.add("flex");
+      document.getElementById("btn-confirm-cancel").onclick = () => { modal.classList.add("hidden"); modal.classList.remove("flex"); };
+      document.getElementById("btn-confirm-ok").onclick = () => { onOk(); modal.classList.add("hidden"); modal.classList.remove("flex"); };
+    };
+
+    const getBlockTimeRange = (block) => {
+      const start = TIME_SLOTS[block.startRow];
+      let endIdx = block.startRow + block.rowSpan - 1;
+      if (endIdx >= TIME_SLOTS.length) endIdx = TIME_SLOTS.length - 1;
+      const end = TIME_SLOTS[endIdx];
+      return start && end ? `${start.split(" - ")[0]} - ${end.split(" - ")[1]}` : "";
+    };
+
+    const getCellStatus = (day, rIdx) => {
+      const start = blocks.find(b => b.day === day && b.startRow === rIdx);
+      if (start) return { status: "start", block: start };
+      const covered = blocks.find(b => b.day === day && rIdx > b.startRow && rIdx < (b.startRow + b.rowSpan));
+      if (covered) return { status: "covered", block: covered };
+      return { status: "empty", block: null };
+    };
+
+    // 4. LOGIKA RENDER TABEL
+    const renderTable = () => {
+      const container = document.getElementById("table-wrapper");
+      container.innerHTML = "";
+
+      const table = document.createElement("table");
+      // Mencegah tabel ter-compress di HP (min-width tetap 880px)
+      table.className = "w-full border-collapse select-none mx-auto text-center table-fixed text-[13px] text-black font-sans";
+      table.style.minWidth = "880px"; 
+
+      if (viewMode === "classic") {
+        table.style.border = "2px solid black";
+        let theadHTML = `<thead><tr>
+          <th class="bg-[#1f385c] text-white p-2 font-bold text-[14px] sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] print:relative print:shadow-none" style="width:120px; border:1px solid black;">Pukul</th>
+          ${DAYS.map(d => `<th class="bg-[#1f75b7] text-white p-2 font-bold text-[14px] uppercase" style="border:1px solid black;">${d}</th>`).join('')}
+        </tr></thead>`;
+        table.innerHTML = theadHTML;
+
+        const tbody = document.createElement("tbody");
+        TIME_SLOTS.forEach((time, rIdx) => {
+          const tr = document.createElement("tr");
+          tr.style.height = "30px";
+
+          const tdTime = document.createElement("td");
+          tdTime.className = "bg-[#dedede] font-bold px-1 sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.2)] print:relative print:shadow-none";
+          tdTime.style.border = "1px solid black";
+          tdTime.style.backgroundClip = "padding-box";
+          tdTime.innerText = time;
+          tr.appendChild(tdTime);
+
+          DAYS.forEach((day) => {
+            const cell = getCellStatus(day, rIdx);
+            if (cell.status === "covered") return;
+
+            const td = document.createElement("td");
+            td.style.border = "1px solid black";
+
+            if (cell.status === "start") {
+              td.setAttribute("rowspan", cell.block.rowSpan);
+              let bg = "#ffffff";
+              if (cell.block.type === "yellow") bg = "#ffff00";
+              else if (cell.block.type === "green") bg = "#00b050";
+              else if (cell.block.type === "orange") bg = "#ff9f00";
+              td.style.backgroundColor = bg;
+              
+              td.className = `p-1 align-middle relative ${isExporting ? "" : (editMode ? "cursor-pointer hover:brightness-95" : "cursor-default")}`;
+              
+              td.innerHTML = `
+                <div class="flex flex-col items-center justify-center leading-tight">
+                  <span class="text-[13px] font-extrabold text-black tracking-tight">${cell.block.text}</span>
+                  <span class="text-[10px] font-bold text-black mt-0.5">${getBlockTimeRange(cell.block)}</span>
+                  ${editMode && !isExporting ? `<button class="delete-btn absolute right-0.5 top-0.5 w-4 h-4 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">×</button>` : ""}
+                </div>`;
+              
+              if (!isExporting) {
+                const delBtn = td.querySelector('.delete-btn');
+                if (delBtn) delBtn.onclick = (e) => { e.stopPropagation(); deleteBlockDirectly(cell.block.id); };
+                td.onclick = () => editMode ? openEditor(cell.block) : showToast("Aktifkan 'Mode Edit' untuk mengubah.");
+              }
+            } else {
+              td.className = `bg-white ${isExporting ? "" : (editMode ? "cursor-pointer hover:bg-slate-100" : "cursor-default")}`;
+              if (!isExporting) td.onclick = () => editMode ? openEditor(null, day, rIdx) : null;
+            }
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+
+      } else {
+        table.className = "w-full border-collapse select-none mx-auto text-center table-fixed";
+        let theadHTML = `<thead><tr class="bg-slate-100">
+          <th class="p-3 text-xs font-bold text-slate-500 uppercase sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:relative print:shadow-none" style="width:120px; background-clip: padding-box;">Pukul</th>
+          ${DAYS.map(d => `<th class="p-3 text-xs font-bold text-slate-700 uppercase">${d}</th>`).join('')}
+        </tr></thead>`;
+        table.innerHTML = theadHTML;
+
+        const tbody = document.createElement("tbody");
+        tbody.className = "divide-y divide-slate-100";
+        TIME_SLOTS.forEach((time, rIdx) => {
+          const tr = document.createElement("tr");
+          const tdTime = document.createElement("td");
+          tdTime.className = "py-2 bg-slate-50/95 sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:relative print:shadow-none";
+          tdTime.style.backgroundClip = "padding-box";
+          tdTime.innerHTML = `<span class="bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded font-mono text-[11px] font-bold">${time}</span>`;
+          tr.appendChild(tdTime);
+
+          DAYS.forEach((day) => {
+            const cell = getCellStatus(day, rIdx);
+            if (cell.status === "covered") return;
+
+            const td = document.createElement("td");
+            td.className = "p-0.5 align-middle";
+
+            if (cell.status === "start") {
+              td.setAttribute("rowspan", cell.block.rowSpan);
+              let color = "bg-yellow-100 text-yellow-950 border-yellow-300";
+              if (cell.block.type === "green") color = "bg-emerald-100 text-emerald-950 border-emerald-300";
+              else if (cell.block.type === "orange") color = "bg-orange-100 text-orange-950 border-orange-300";
+
+              td.innerHTML = `
+                <div class="mx-0.5 p-1 rounded-lg border shadow-sm flex flex-col items-center justify-center min-h-[38px] relative ${color} ${!isExporting && editMode ? "cursor-pointer hover:opacity-90" : ""}">
+                  <span class="text-[13px] font-extrabold tracking-tight">${cell.block.text}</span>
+                  <span class="text-[10px] font-bold mt-0.5">${getBlockTimeRange(cell.block)}</span>
+                  ${editMode && !isExporting ? `<button class="delete-btn absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center">×</button>` : ""}
+                </div>`;
+                
+              if (!isExporting) {
+                const delBtn = td.querySelector('.delete-btn');
+                if (delBtn) delBtn.onclick = (e) => { e.stopPropagation(); deleteBlockDirectly(cell.block.id); };
+                td.onclick = () => editMode ? openEditor(cell.block) : showToast("Aktifkan 'Mode Edit' untuk mengubah.");
+              }
+            } else {
+              td.innerHTML = `<div class="min-h-[36px] rounded-lg border flex items-center justify-center ${isExporting ? "border-transparent" : (editMode ? "border-dashed border-slate-200 hover:bg-slate-50 cursor-pointer" : "border-transparent")}">
+                ${editMode && !isExporting ? '<span class="text-slate-300 text-xl font-bold leading-none">+</span>' : ""}
+              </div>`;
+              if (!isExporting) td.onclick = () => editMode ? openEditor(null, day, rIdx) : null;
+            }
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+      }
+      container.appendChild(table);
+    };
+
+    // 5. EDITOR JADWAL
+    const populateEditorDropdowns = () => {
+      document.getElementById("form-day").innerHTML = DAYS.map(d => `<option value="${d}">${d}</option>`).join("");
+      document.getElementById("form-start-row").innerHTML = TIME_SLOTS.map((t, i) => `<option value="${i}">${t.split(" - ")[0]}</option>`).join("");
+    };
+
+    const openEditor = (block, defaultDay, defaultRowIndex) => {
+      selectedBlock = block;
+      populateEditorDropdowns();
+      
+      const title = document.getElementById("editor-modal-title");
+      const btnDelete = document.getElementById("btn-delete-block");
+
+      if (block) {
+        title.innerText = "Ubah Detail Jadwal";
+        document.getElementById("form-name").value = block.text;
+        document.getElementById("form-day").value = block.day;
+        document.getElementById("form-type").value = block.type;
+        document.getElementById("form-start-row").value = block.startRow;
+        document.getElementById("form-row-span").value = block.rowSpan;
+        btnDelete.classList.remove("hidden");
+      } else {
+        title.innerText = "Tambah Jadwal Baru";
+        document.getElementById("form-name").value = "";
+        document.getElementById("form-day").value = defaultDay;
+        document.getElementById("form-type").value = "yellow";
+        document.getElementById("form-start-row").value = defaultRowIndex;
+        document.getElementById("form-row-span").value = 2;
+        btnDelete.classList.add("hidden");
+      }
+      document.getElementById("editor-modal").classList.remove("hidden");
+      document.getElementById("editor-modal").classList.add("flex");
+    };
+
+    const closeEditor = () => {
+      document.getElementById("editor-modal").classList.add("hidden");
+      document.getElementById("editor-modal").classList.remove("flex");
+    };
+
+    document.getElementById("btn-cancel-editor").onclick = closeEditor;
+    document.getElementById("btn-close-editor").onclick = closeEditor;
+
+    document.getElementById("editor-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const text = document.getElementById("form-name").value.trim();
+      if (!text) { showToast("Nama tidak boleh kosong!"); return; }
+
+      const payload = {
+        text: text,
+        day: document.getElementById("form-day").value,
+        type: document.getElementById("form-type").value,
+        startRow: parseInt(document.getElementById("form-start-row").value),
+        rowSpan: parseInt(document.getElementById("form-row-span").value)
+      };
+
+      const hasCollision = blocks.some(b => {
+        if (selectedBlock && b.id === selectedBlock.id) return false;
+        if (b.day !== payload.day) return false;
+        return (payload.startRow < (b.startRow + b.rowSpan) && (payload.startRow + payload.rowSpan) > b.startRow);
+      });
+
+      if (hasCollision) { showToast("Waktu bertabrakan dengan jadwal lain!"); return; }
+
+      const targetId = selectedBlock ? selectedBlock.id : Date.now().toString();
+      await setDoc(doc(db, "schedules", targetId), payload);
+      showToast("Tersimpan di Cloud Database!");
+      closeEditor();
+    };
+
+    window.deleteBlockDirectly = (id) => {
+      const b = blocks.find(x => x.id === id);
+      if(b) showConfirm(`Hapus jadwal ${b.text}?`, "Hapus", async () => {
+        await deleteDoc(doc(db, "schedules", id));
+        showToast("Jadwal dihapus.");
+      });
+    };
+
+    document.getElementById("btn-delete-block").onclick = () => {
+      if(selectedBlock) window.deleteBlockDirectly(selectedBlock.id);
+      closeEditor();
+    };
+
+    // 6. FIREBASE LISTENER (DENGAN FALLBACK JIKA AUTH GAGAL)
+    const initSnapshot = () => {
+      onSnapshot(schedulesRef, (snapshot) => {
+        blocks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderTable();
+      }, (err) => {
+        console.error("Firestore error:", err);
+        showToast("Hanya mode baca. Database cloud menolak izin tulis.");
+      });
+    };
+
+    signInAnonymously(auth).then(initSnapshot).catch(err => {
+      console.warn("Auth anonim gagal (mungkin belum diaktifkan di konsol). Melanjutkan sinkronisasi dasar...", err);
+      initSnapshot();
+    });
+
+    // 7. FUNGSI EKSPOR ANTI-TERPOTONG
+    const exportDocument = async (type) => {
+      try {
+        const overlay = document.getElementById("loading-overlay");
+        document.getElementById("loading-text").innerText = `Membuat berkas ${type.toUpperCase()} HD...`;
+        
+        isExporting = true;
+        renderTable();
+        overlay.classList.remove("hidden"); overlay.classList.add("flex");
+        
+        await new Promise(r => setTimeout(r, 200));
+
+        const targetEl = document.getElementById("schedule-table-card");
+        
+        // Simpan gaya asli
+        const origWidth = targetEl.style.width;
+        const origMaxWidth = targetEl.style.maxWidth;
+        const origOverflow = targetEl.style.overflow;
+        
+        // Paksa Container memiliki dimensi penuh saat proses capture
+        targetEl.style.width = "880px";
+        targetEl.style.maxWidth = "none";
+        targetEl.style.overflow = "visible";
+        document.getElementById("export-header").classList.remove("hidden");
+
+        const canvas = await window.html2canvas(targetEl, {
+          scale: 3, 
+          useCORS: true, 
+          logging: false, 
+          backgroundColor: "#ffffff",
+          windowWidth: 880
+        });
+
+        // Kembalikan gaya ke bentuk responsif semula
+        targetEl.style.width = origWidth;
+        targetEl.style.maxWidth = origMaxWidth;
+        targetEl.style.overflow = origOverflow;
+        document.getElementById("export-header").classList.add("hidden");
+
+        const imgData = canvas.toDataURL("image/png");
+        const dateStr = getFormattedDate();
+
+        if (type === 'png') {
+          const a = document.createElement("a");
+          a.href = imgData; a.download = `Jadwal_${dateStr}.png`; a.click();
+          showToast("Gambar berhasil diunduh.");
+        } else {
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF("l", "mm", "a4");
+          const pW = pdf.internal.pageSize.getWidth() - 20; 
+          const pH = (canvas.height * pW) / canvas.width;
+          pdf.addImage(imgData, "PNG", 10, 10, pW, pH, undefined, "FAST");
+          pdf.save(`Jadwal_${dateStr}.pdf`);
+          showToast("PDF berhasil diunduh.");
+        }
+      } catch (err) {
+        console.error(err);
+        showToast("Terjadi kesalahan sistem saat mengekspor.");
+      } finally {
+        isExporting = false;
+        renderTable();
+        document.getElementById("loading-overlay").classList.add("hidden");
+        document.getElementById("loading-overlay").classList.remove("flex");
+      }
+    };
+
+    document.getElementById("btn-export-png").onclick = () => exportDocument('png');
+    document.getElementById("btn-export-pdf").onclick = () => exportDocument('pdf');
+    document.getElementById("btn-print").onclick = () => window.print();
+
+    // 8. KENDALI TOMBOL ATAS
+    document.getElementById("btn-view-classic").onclick = function() {
+      viewMode = "classic"; 
+      this.className = "px-3 py-1.5 rounded text-xs font-semibold bg-white text-indigo-950 shadow transition";
+      document.getElementById("btn-view-modern").className = "px-3 py-1.5 rounded text-xs font-semibold text-white hover:bg-white/10 transition";
+      renderTable();
+    };
+    document.getElementById("btn-view-modern").onclick = function() {
+      viewMode = "modern"; 
+      this.className = "px-3 py-1.5 rounded text-xs font-semibold bg-white text-indigo-950 shadow transition";
+      document.getElementById("btn-view-classic").className = "px-3 py-1.5 rounded text-xs font-semibold text-white hover:bg-white/10 transition";
+      renderTable();
+    };
+
+    document.getElementById("btn-toggle-edit").onclick = function() {
+      editMode = !editMode;
+      if (editMode) {
+        this.className = "px-3 py-1.5 rounded-lg text-xs font-bold border bg-emerald-500 text-white";
+        document.getElementById("text-toggle-edit").innerText = "Mode Edit: ON";
+        document.getElementById("info-edit-mode").classList.remove("hidden");
+        document.getElementById("info-edit-mode").classList.add("flex");
+      } else {
+        this.className = "px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-700 text-white border-slate-600";
+        document.getElementById("text-toggle-edit").innerText = "Edit Jadwal";
+        document.getElementById("info-edit-mode").classList.add("hidden");
+        document.getElementById("info-edit-mode").classList.remove("flex");
+      }
+      renderTable();
+    };
+
+    document.getElementById("btn-reset").onclick = () => {
+      showConfirm("Hati-hati! Ini akan menghapus semua database jadwal di Cloud. Lanjutkan?", "Reset Database", async () => {
+        for (const b of blocks) { await deleteDoc(doc(db, "schedules", b.id)); }
+        showToast("Database dibersihkan.");
+      });
+    };
+
+  </script>
+</body>
+</html>

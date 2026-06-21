@@ -252,13 +252,11 @@
       return { status: "empty", block: null };
     };
 
-    // 4. LOGIKA RENDER TABEL
     const renderTable = () => {
       const container = document.getElementById("table-wrapper");
       container.innerHTML = "";
 
       const table = document.createElement("table");
-      // Mencegah tabel ter-compress di HP (min-width tetap 880px)
       table.className = "w-full border-collapse select-none mx-auto text-center table-fixed text-[13px] text-black font-sans";
       table.style.minWidth = "880px"; 
 
@@ -366,7 +364,7 @@
               }
             } else {
               td.innerHTML = `<div class="min-h-[36px] rounded-lg border flex items-center justify-center ${isExporting ? "border-transparent" : (editMode ? "border-dashed border-slate-200 hover:bg-slate-50 cursor-pointer" : "border-transparent")}">
-                ${editMode && !isExporting ? '<span class="text-slate-400 text-xl font-bold leading-none">+</span>' : ""}
+                ${editMode && !isExporting ? '<span class="text-slate-300 text-xl font-bold leading-none">+</span>' : ""}
               </div>`;
               if (!isExporting) td.onclick = () => editMode ? openEditor(null, day, rIdx) : null;
             }
@@ -379,7 +377,6 @@
       container.appendChild(table);
     };
 
-    // 5. EDITOR JADWAL
     const populateEditorDropdowns = () => {
       document.getElementById("form-day").innerHTML = DAYS.map(d => `<option value="${d}">${d}</option>`).join("");
       document.getElementById("form-start-row").innerHTML = TIME_SLOTS.map((t, i) => `<option value="${i}">${t.split(" - ")[0]}</option>`).join("");
@@ -461,7 +458,6 @@
       closeEditor();
     };
 
-    // 6. FIREBASE LISTENER (DENGAN FALLBACK JIKA AUTH GAGAL)
     const initSnapshot = () => {
       onSnapshot(schedulesRef, (snapshot) => {
         blocks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -477,7 +473,6 @@
       initSnapshot();
     });
 
-    // 7. FUNGSI EKSPOR ANTI-TERPOTONG (MENGGUNAKAN OFF-SCREEN SANDBOX CLONING KHUSUS HP)
     const exportDocument = async (type) => {
       try {
         const overlay = document.getElementById("loading-overlay");
@@ -498,7 +493,7 @@
         sandbox.style.position = "absolute";
         sandbox.style.left = "-9999px";
         sandbox.style.top = "0";
-        sandbox.style.width = "920px"; // Beri ruang bernapas ekstra untuk margins/paddings
+        sandbox.style.width = "920px"; // Beri ruang ekstra
         sandbox.style.height = "auto";
         sandbox.style.overflow = "visible";
         sandbox.style.backgroundColor = "#f8fafc"; // samakan dengan warna latar belakang body (bg-slate-50)
@@ -535,6 +530,13 @@
           clonedTable.style.maxWidth = "100%";
           clonedTable.style.overflow = "visible";
         }
+
+        // 4. CRITICAL: Singkirkan properti position: sticky pada kloningan agar tidak tumpang tindih / bergeser di hasil html2canvas!
+        clonedElement.querySelectorAll(".sticky").forEach(el => {
+          el.style.position = "static";
+          el.classList.remove("sticky", "left-0", "z-10", "z-20", "shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]", "shadow-[2px_0_5px_-2px_rgba(0,0,0,0.2)]");
+          el.style.boxShadow = "none";
+        });
 
         sandbox.appendChild(clonedElement);
         document.body.appendChild(sandbox);
